@@ -1,3 +1,4 @@
+from glob import glob
 from pygame import display, time, draw, QUIT, init, KEYDOWN, K_a, K_s, K_d, K_w
 from random import randint
 import pygame
@@ -15,6 +16,16 @@ YELLOW = (255, 255, 0)
 
 width = 600
 height = 600
+
+#stuff for snake
+current = 15
+cols = None
+rows = None
+wr = None
+hr = None
+direction = 1
+score = 0
+grid = None
 
 screen = display.set_mode([width, height])
 display.set_caption("snake_self")
@@ -82,8 +93,6 @@ def main_menu():
         pygame.display.update()
         clock.tick(30)
 
-current = 15
-
 def make_str(flag):
     global current
     if flag==1:
@@ -142,51 +151,14 @@ def setting_menu():
                 #print(current)
 
         clock.tick(30)
+    define_snake_stuff(make_str(-2))
 
-#a-star algorithm
-def getpath(food1, snake1):
-    food1.camefrom = []
-    for s in snake1:
-        s.camefrom = []
-    openset = [snake1[-1]]
-    closedset = []
-    dir_array1 = []
-    while 1:
-        current1 = min(openset, key=lambda x: x.f)
-        openset = [openset[i] for i in range(len(openset)) if not openset[i] == current1]
-        closedset.append(current1)
-        for neighbor in current1.neighbors:
-            if neighbor not in closedset and not neighbor.obstrucle and neighbor not in snake1:
-                tempg = neighbor.g + 1
-                if neighbor in openset:
-                    if tempg < neighbor.g:
-                        neighbor.g = tempg
-                else:
-                    neighbor.g = tempg
-                    openset.append(neighbor)
-                neighbor.h = sqrt((neighbor.x - food1.x) ** 2 + (neighbor.y - food1.y) ** 2)
-                neighbor.f = neighbor.g + neighbor.h
-                neighbor.camefrom = current1
-        if current1 == food1: #exit of infinite loop
-            break
-    while current1.camefrom: #mencatat direction untuk mendapatkan food dengan flag angka
-        if current1.x == current1.camefrom.x and current1.y < current1.camefrom.y:
-            dir_array1.append(2)
-        elif current1.x == current1.camefrom.x and current1.y > current1.camefrom.y:
-            dir_array1.append(0)
-        elif current1.x < current1.camefrom.x and current1.y == current1.camefrom.y:
-            dir_array1.append(3)
-        elif current1.x > current1.camefrom.x and current1.y == current1.camefrom.y:
-            dir_array1.append(1)
-        current1 = current1.camefrom
-    #print(dir_array1)
-    for i in range(rows):
-        for j in range(cols):
-            grid[i][j].camefrom = []
-            grid[i][j].f = 0
-            grid[i][j].h = 0
-            grid[i][j].g = 0
-    return dir_array1
+def define_snake_stuff(num):
+    global rows, cols, wr, hr
+    rows=num
+    cols=num
+    wr = width/cols
+    hr = height/rows
 
 def game_over():
     screen.fill(BLACK)
@@ -199,7 +171,6 @@ def draw_score():
     title=text_format(score_it(2), font, 10, YELLOW)
     title_rect=title.get_rect()
     screen.blit(title, (540 - (title_rect[2]/2), 15))
-    #pygame.display.flip()
 
 def score_it(flag):
     global score
@@ -209,7 +180,7 @@ def score_it(flag):
     elif flag==2:
         return "Score : "+str(score)
 
-#inisialisasi kebutuhan pada pencarian a-starnya 
+#class for snake self
 class Spot:
     def __init__(self, x, y):
         self.x = x
@@ -238,75 +209,123 @@ class Spot:
         if self.y < cols - 1:
             self.neighbors.append(grid[self.x][self.y + 1])
 
-main_menu()
-setting_menu()
-
-cols = current
-rows = current
-wr = width/cols
-hr = height/rows
-direction = 1
-score = 0
-
-#inisialisasi grid berdasarkan kolom dan baris yang akan dipakai untuk arena ular
-grid = [[Spot(i, j) for j in range(cols)] for i in range(rows)]
-
-#inisialisasi masing-masing neighbor dari setiap grid nya
-for i in range(rows):
-    for j in range(cols):
-        grid[i][j].add_neighbors()
-
-snake = [grid[round(rows/2)][round(cols/2)]] #Inisialisasi awal mulai snake dari tengah-tengah layar
-food = grid[randint(0, rows-1)][randint(0, cols-1)] #Food selalu diinisialisasi secara acak dengan syntax radint dengan interval 0 hingga (kolom atau baris)
-current = snake[-1] #Posisi current merupakan posisi kepala daripada si ular
-dir_array = getpath(food, snake) #dir_array yaitu array untuk mendapatkan direction flag daripada pergerakan ular tersebut
-food_array = [food] #array yang mencatat riwayat daripada food yang pernah dipakai sebelumnya.
-
-while not done:
-    clock.tick(12)
-    screen.fill(BLACK)
-    #Inisialisasi direction dengan mengambil nilai terbelakang daripada dir_array dan append si snake tersebut ke arah sesuai nilai flag tersebut.
-    direction = dir_array.pop(-1)
-    if direction == 0:    # down
-        snake.append(grid[current.x][current.y + 1])
-    elif direction == 1:  # right
-        snake.append(grid[current.x + 1][current.y])
-    elif direction == 2:  # up
-        snake.append(grid[current.x][current.y - 1])
-    elif direction == 3:  # left
-        snake.append(grid[current.x - 1][current.y])
-    current = snake[-1]
-
-    #saat kepala ular menenui makanannya, tambahkan scorenya dan buat food baru dengan posisi acak dan cari path kembali
-    if current.x == food.x and current.y == food.y:
-        score_it(1)
-        while 1:
-            food = grid[randint(0, rows - 1)][randint(0, cols - 1)]
-            if not (food.obstrucle or food in snake):
-                break
-        food_array.append(food)
-        dir_array = getpath(food, snake)
-    else: #jika ular belum bertemu makanan, maka hapus bagian ekor ter-belakang ular
-        snake.pop(0)
-
-    #beri warna badan ular dengan warna putih
-    for spot in snake:
-        spot.show(WHITE)
-    #beri warna obstruclenya dengan warna merah
+#a-star algorithm
+def getpath(food1, snake1):
+    #inisialisasi array kosong terlebih dahulu untuk tiap variabel yang dibutuhkan
+    food1.camefrom = []
+    for s in snake1:
+        s.camefrom = []
+    openset = [snake1[-1]]
+    closedset = []
+    dir_array1 = []
+    while 1:
+        current1 = min(openset, key=lambda x: x.f)
+        openset = [openset[i] for i in range(len(openset)) if not openset[i] == current1] 
+        closedset.append(current1)
+        for neighbor in current1.neighbors:
+            if neighbor not in closedset and not neighbor.obstrucle and neighbor not in snake1:
+                tempg = neighbor.g + 1
+                if neighbor in openset:
+                    if tempg < neighbor.g:
+                        neighbor.g = tempg
+                else:
+                    neighbor.g = tempg
+                    openset.append(neighbor)
+                neighbor.h = sqrt((neighbor.x - food1.x) ** 2 + (neighbor.y - food1.y) ** 2)
+                neighbor.f = neighbor.g + neighbor.h
+                neighbor.camefrom = current1
+        if current1 == food1: #exit case dari infinite loop
+            break
+    while current1.camefrom: #catat path dari food ke snake nya kedalam dir_array1
+        if current1.x == current1.camefrom.x and current1.y < current1.camefrom.y:
+            dir_array1.append(2)
+        elif current1.x == current1.camefrom.x and current1.y > current1.camefrom.y:
+            dir_array1.append(0)
+        elif current1.x < current1.camefrom.x and current1.y == current1.camefrom.y:
+            dir_array1.append(3)
+        elif current1.x > current1.camefrom.x and current1.y == current1.camefrom.y:
+            dir_array1.append(1)
+        current1 = current1.camefrom
+    #print(dir_array1)
     for i in range(rows):
         for j in range(cols):
-            if grid[i][j].obstrucle:
-                grid[i][j].show(RED)
+            grid[i][j].camefrom = []
+            grid[i][j].f = 0
+            grid[i][j].h = 0
+            grid[i][j].g = 0
+    return dir_array1
 
-    food.show(GREEN) #beri warna makanan dengan warna hijau
-    snake[-1].show(BLUE) #beri warna kepala ular dengan warna biru
-    draw_score() #menampilkan score
-    display.flip()
-    for event in pygame.event.get():
-        if event.type == QUIT:
-            done = True
-        elif event.type == KEYDOWN:
-            if event.key==pygame.K_ESCAPE:          
-                game_over()
-                time.wait(1000)
+def snake_main():
+    #inisialisasi grid berdasarkan kolom dan baris yang akan dipakai untuk arena ular
+    global grid
+    grid = [[Spot(i, j) for j in range(cols)] for i in range(rows)]
+
+    #inisialisasi masing-masing neighbor dari setiap grid nya
+    for i in range(rows):
+        for j in range(cols):
+            grid[i][j].add_neighbors()
+
+    snake = [grid[round(rows/2)][round(cols/2)]] #inisialisasi awal mulai snake dari tengah-tengah layar
+    food = grid[randint(0, rows-1)][randint(0, cols-1)] #food selalu diinisialisasi secara acak dengan syntax radint dengan interval 0 hingga (kolom atau baris)
+    current = snake[-1] #posisi current merupakan posisi kepala daripada si ular
+    dir_array = getpath(food, snake) #dir_array yaitu array untuk mendapatkan direction flag daripada pergerakan ular tersebut
+    food_array = [food] #array yang mencatat riwayat daripada food yang pernah dipakai sebelumnya.
+
+    global done
+    while not done:
+        clock.tick(12)
+        screen.fill(BLACK)
+        #Inisialisasi direction dengan mengambil nilai terbelakang daripada dir_array dan append si snake tersebut ke arah sesuai nilai flag tersebut.
+        direction = dir_array.pop(-1)
+        if direction == 0:    # down
+            snake.append(grid[current.x][current.y + 1])
+        elif direction == 1:  # right
+            snake.append(grid[current.x + 1][current.y])
+        elif direction == 2:  # up
+            snake.append(grid[current.x][current.y - 1])
+        elif direction == 3:  # left
+            snake.append(grid[current.x - 1][current.y])
+        current = snake[-1]
+
+        #saat kepala ular menenui makanannya, tambahkan scorenya dan buat food baru dengan posisi acak dan cari path kembali
+        if current.x == food.x and current.y == food.y:
+            score_it(1)
+            while 1:
+                food = grid[randint(0, rows - 1)][randint(0, cols - 1)]
+                if not (food.obstrucle or food in snake):
+                    break
+            food_array.append(food)
+            dir_array = getpath(food, snake)
+        else: #jika ular belum bertemu makanan, maka hapus bagian ekor ter-belakang ular
+            snake.pop(0)
+
+        #beri warna badan ular dengan warna putih
+        for spot in snake:
+            spot.show(WHITE)
+        #beri warna obstruclenya dengan warna merah
+        for i in range(rows):
+            for j in range(cols):
+                if grid[i][j].obstrucle:
+                    grid[i][j].show(RED)
+
+        food.show(GREEN) #beri warna makanan dengan warna hijau
+        snake[-1].show(BLUE) #beri warna kepala ular dengan warna biru
+        draw_score() #menampilkan score
+        display.flip()
+        for event in pygame.event.get():
+            if event.type == QUIT:
                 done = True
+            elif event.type == KEYDOWN:
+                if event.key==pygame.K_ESCAPE:          
+                    game_over()
+                    time.wait(1000)
+                    done = True
+
+
+if __name__ == '__main__':
+    main_menu()
+    setting_menu()
+    snake_main()
+    game_over()
+    time.wait(1000)
+    pygame.quit()
